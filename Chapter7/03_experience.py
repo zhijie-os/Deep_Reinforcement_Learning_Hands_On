@@ -73,7 +73,8 @@ if __name__ == "__main__":
     # returns state, action, reward, last_state
     exp_source = ptan.experience.ExperienceSourceFirstLast(
         env, agent, gamma=1.0, steps_count=1)
-    for idx, exp in enumerate(exp_source):
+    for idx, exp i
+    n enumerate(exp_source):
         print(exp)
         if idx > 10:
             break

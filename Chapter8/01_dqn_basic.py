@@ -8,6 +8,7 @@ import torch.optim as optim
 from ignite.engine import Engine
 
 from lib import dqn_model, common
+import ale_py # This import is necessary for environments to register 
 
 NAME = "01_baseline"
 
@@ -66,7 +67,7 @@ def train(params: common.Hyperparams,
 
         # apply the gradient
         loss_v.backward()
-        optmizer.step() # update the network parameters
+        optimizer.step() # update the network parameters
         epsilon_tracker.frame(engine.state.iteration)   # update the epsilon value
         # for every target_net_sync iterations, sync the target network with the current network
         if engine.state.iteration % params.target_net_sync == 0:

@@ -8,17 +8,22 @@ class DQN(nn.Module):
                  n_actions: int):
         super(DQN, self).__init__()
 
+        # hidden layer [(32), (64)]
         self.conv = nn.Sequential(
+            # input shape -> 32
             nn.Conv2d(input_shape[0], 32, kernel_size=8, stride=4),
             nn.ReLU(),
+            # 32 -> 64
             nn.Conv2d(32, 64, kernel_size=4, stride=2),
             nn.ReLU(),
+            # 64 -> 64
             nn.Conv2d(64, 64, kernel_size=3, stride=1),
             nn.ReLU(),
             nn.Flatten(),
         )
         size = self.conv(torch.zeros(1, *input_shape)).size()[-1]
         self.fc = nn.Sequential(
+            # hidden layer = 512
             nn.Linear(size, 512),
             nn.ReLU(),
             nn.Linear(512, n_actions)

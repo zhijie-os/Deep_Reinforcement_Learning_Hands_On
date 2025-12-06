@@ -51,13 +51,17 @@ GAME_PARAMS = {
         replay_size = 100000,
         replay_initial = 10000,
         target_net_sync = 1000,
-        epsilon_frames = 100000,
-        epsilon_final = 0.02,
+        epsilon_frames = 100000, # decay in every 100 thousands frame
+        epsilon_final = 0.02, # final epsilon value, the lowest exploration rate would 0.2
     ),
 }
 
 # this function unpacks batch of ExperienceFirstLast into separate arrays
 def unpack_batch(batch: tt.List[ExperienceFirstLast]):
+    # state: observation from the environment
+    # action: integer action taken by the agent
+    # reward: immediate reward if the step_count = 1; if the step_count is larger, we use discontinued sum of rewards
+    # last state: If the transition corresponds to the final step in the environment, then the field is None; otherwise, it contains the last observation in the experience chain
     states, actions, rewards, dones, last_states = [], [], [], [], []
     for exp in batch:
         states.append(exp.state)
@@ -86,16 +90,19 @@ def calc_loss_dqn(batch: tt.List[ExperienceFirstLast],
     dones_v = torch.tensor(dones).to(device)
     last_states_v = torch.tensor(last_states).to(device)
 
-    actions_v = actions_v.unsqueeze(-1)
-    state_action_vals = net(states_v).gather(1, actions_v)
-    state_action_vals = state_action_vals.squeeze(-1)
+    # using the current net to get Q-values for all actions
+    actions_v = actions_v.unsqueeze(-1) # make actions_v shape (batch_size, 1)
+    state_action_vals = net(states_v).gather(1, actions_v)  # get Q-values for taken actions only
+    state_action_vals = state_action_vals.squeeze(-1) # shape (batch_size,)
 
+    # use the target network to get the max Q-value for the next state
     with torch.no_grad():
         next_state_values = tgt_net(last_states_v).max(1)[0]
         # PyTorch boolean indexing operation (works similarly to NumPy).
         next_state_values[dones_v] = 0.0
         expected_state_action_values = rewards_v + gamma * next_state_values
 
+    # use MSE loss to minimize the difference between current Q-values(from current net) and expected Q-values (from target net)
     return nn.MSELoss()(state_action_vals, expected_state_action_values)
 
 class EpsilonTracker:
@@ -104,6 +111,7 @@ class EpsilonTracker:
         self.params = params
         self.frame(0)   # call the first epsilon udpate
 
+    # eps decay some amount very epsilon_frames until it reachese epsilon_final
     def frame(self, frame_idx: int):
         eps = self.params.epsilon_start - frame_idx / self.params.epsilon_frames
         self.selector.epsilon = max(self.params.epsilon_final, eps)
@@ -111,8 +119,10 @@ class EpsilonTracker:
 #  this takes a replay buffer and yields batches of ExperienceFirstLast objects
 def batch_generator(buffer: ExperienceReplayBuffer, initial: int, batch_size: int) \
     -> tt.Generator[tt.List[ExperienceFirstLast], None, None]:
+    # initialize the buffer with some experiences first (initialis the number of experience needed)
     buffer.populate(initial)
     while True:
+        # get one more experience to keep the buffer fresh
         buffer.populate(1)
         # each call to next() resumes this generator, and runs the loop body until it reaches the next yield
         yield buffer.sample(batch_size)
@@ -135,6 +145,7 @@ def setup_ignite(engine: Engine,
     # We calculate frames per seconds (FPS) as a performance metric
     ptan_ignite.EpisodeFPSHanlder().attach(engine)
 
+    # ignite engine where the episode completed event is handled
     @engine.on(ptan_ignite.EpisodeEvents.EPISODE_COMPLETED)
     def episode_completed(trainer: Engine):
         passed = trainer.state.metrics.get("time_passed", 0.0)
@@ -146,6 +157,7 @@ def setup_ignite(engine: Engine,
             timedelta(seconds=int(passed))
         ))
     
+    # game solved event handler
     @engine.on(ptan_ignite.EpisodeEvents.BOUND_REWARD_RECHAED)
     def game_solve(trainer: Engine):
         passed = trainer.state.metrics['time_passed']
@@ -157,12 +169,15 @@ def setup_ignite(engine: Engine,
         trainer.should_terminate = True
         trainer.state.solved = True
 
+    # get the time
     now = datetime.now().isoformat(timespec="minutes").replace(":", " ")
     logdir = f"runs/{now} - {params.run_game} - {run_name}"
     tb = tb_logger.TensorboardLogger(log_dir=logdir)
     run_avg = RunningAverage(output_transform=lambda v:v["loss"])
     run_avg.attach(engine, "avg_loss")
+    # get the avergae loss
 
+    # attach the metrics to tensorboard logger
     metrics = ['reward', 'steps', 'avg_reward']
     handler = tb_logger.OutputHandler(tag="episodes", metric_names=metrics)
     event = ptan_ignite.EpisodeEvents.EPISODE_COMPLETED
@@ -176,7 +191,6 @@ def setup_ignite(engine: Engine,
                                       output_transform=lambda a: a)
     event = ptan_ignite.PeriodEvents.ITERS_100_COMPLETED
     tb.attach(engine, log_handler=handler, event_name=event)
-
 
     if params.tuner_mode:
         @engine.on(ptan_ignite.EpisodeEvents.EPISODE_COMPLETED)

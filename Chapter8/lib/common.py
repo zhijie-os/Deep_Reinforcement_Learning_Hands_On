@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import warnings
 import dataclasses
+import ptan
 from datetime import timedelta, datetime
 import typing as tt
 
@@ -104,6 +105,44 @@ def calc_loss_dqn(batch: tt.List[ExperienceFirstLast],
 
     # use MSE loss to minimize the difference between current Q-values(from current net) and expected Q-values (from target net)
     return nn.MSELoss()(state_action_vals, expected_state_action_values)
+
+def calc_loss_double_dqn(batch: tt.List[ptan.experience.ExperienceFirstLast],
+    net: nn.Module, tgt_net: nn.Module, gamma: float, device: torch.device):
+    states, actions, rewards, dones, last_states = unpack_batch(batch)
+
+    states_v = torch.tensor(states).to(device)
+    actions_v = torch.tensor(actions).to(device)
+    rewards_v = torch.tensor(rewards).to(device)
+    dones_v = torch.tensor(dones).to(device).bool()
+    last_states_v = torch.tensor(last_states).to(device)
+
+
+    # using the current net to get Q-values for all actions
+    actions_v = actions_v.unsqueeze(-1) # make actions_v shape (batch_size, 1)
+    state_action_vals = net(states_v).gather(1, actions_v)  # get Q-values for taken actions only
+    state_action_vals = state_action_vals.squeeze(-1) # shape (batch_size,)
+
+    while torch.no_grad():
+        next_states_v = torch.as_tensor(last_states).to(device)
+        next_state_acts = net(next_states_v).max(1)[1] # using the current net to choose the action
+        next_state_acts = next_state_acts.unsqueeze(-1)
+        # using the target net to get the Q-value for the current net chosen action
+        next_state_vals = tgt_net(next_states_v).gather(1, next_state_acts).squeeze(-1)
+        next_state_vals[dones_v] = 0.0
+        expected_state_action_values = rewards_v + gamma * next_state_vals.detach()
+    
+    return nn.MSELoss()(state_action_vals, expected_state_action_values)    # return the MSE loss value
+
+# This function monitors the average Q-value estimates during training as a diagnostic metric
+@torch.no_grad()
+def calc_values_of_states(states: np.ndarray, net: nn.Module, device: torch.device):
+    mean_vals = []
+    for batch in np.array_split(states, 64):
+        states_v = torch.tensor(batch).to(device)
+        action_values_v = net(states_v)
+        best_action_values_v = action_values_v.max(1)[0]
+        mean_vals.append(best_action_values_v.mean().item())
+    return np.mean(mean_vals)
 
 class EpsilonTracker:
     def __init__(self, selector: EpsilonGreedyActionSelector, params: Hyperparams):

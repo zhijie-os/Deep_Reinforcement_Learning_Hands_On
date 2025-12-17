@@ -41,3 +41,22 @@ class NoisyDQN(nn.Module):
     def forward(self, x: torch.ByteTensor):
         xx = x / 255.0
         return self.fc(self.conv(xx))
+    
+    # this is required: the 𝜖 values are not updated after every optimization step
+    # we have to call the reset_noise explicity
+    # 𝜖 is not learnable parameter, it is drawn from the normal distribution
+    def reset_noise(self):
+        for n in self.noisy_layers:
+            n.reset_noise()
+
+
+    # signal-to-noise ratio (SNR) 
+    # 𝑅𝑀𝑆(𝜇)/𝑅𝑀𝑆(𝜎), where 𝑅𝑀𝑆 is the root mean square of the corresponding weights
+    # for metrics
+    @torch.no_grad()
+    def noisy_layers_sigma_snr(self) -> tt.List[float]:
+        return [
+            ((layer.weight_mu ** 2).mean().sqrt() /
+             (layer.weight_sigma ** 2).mean().sqrt()).item()
+            for layer in self.noisy_layers
+        ]

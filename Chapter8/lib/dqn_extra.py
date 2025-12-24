@@ -10,6 +10,63 @@ import typing as tt
 BETA_START = 0.4
 BETA_FRAMES = 100000
 
+class PrioReplayBuffer(ExperienceReplayBuffer):
+    def __init__(self, exp_source: ExperienceSource, buf_size: int, prob_alpha: float = 0.6):
+        super().__init__(exp_source, buf_size)
+        self.experience_source_iter = iter(exp_source)
+        self.capacity = buf_size
+        self.pos = 0
+        self.buffer = []
+        self.prob_alpha = prob_alpha
+        self.priorities = np.zeros((buf_size,), dtype=np.float32)
+        self.beta = BETA_START
+
+    def update_beta(self, idx: int) -> float:
+        v = BETA_START + idx * (1.0 - BETA_START) / BETA_FRAMES # linearly anneal beta from intial value to 1, idx is the current frame index
+        self.beta = min(1.0, v) # maximum at 1.0
+        return self.beta
+
+    # initializing the replay buffer
+    def populate(self, count: int):
+        # get maximum priority
+        max_prio = self.priorities.max(initial=1.0)
+        for _ in range(count):
+            sample = next(self.experience_source_iter)
+            # add to buffer
+            if len(self.buffer) < self.capacity:
+                self.buffer.append(sample)
+            # overwrite old samples if buffer is full
+            else:
+                self.buffer[self.pos] = sample
+            # assign the maximum priority to new sample
+            self.priorities[self.pos] = max_prio
+            # update the position pointer
+            self.pos = (self.pos + 1) % self.capacity
+    
+    def sample(self, batch_size):
+        if len(self.buffer) == self.capacity:
+            prios = self.priorities
+        else:
+            prios = self.priorities[:self.pos]
+        probs = prios ** self.prob_alpha
+        probs /= probs.sum()
+
+        indices = np.random.choice(len(self.buffer), batch_size, p=probs)
+        samples = [self.buffer[idx] for idx in indices]
+
+        total = len(self.buffer)
+        weights = (total * probs[indices]) ** (-self.beta)
+        weights /= weights.max()    # normalize the weights for stability
+
+        return samples, indices, np.array(weights, dtype=np.float32)
+    
+    # helper function to update priorities in batch
+    def update_priorities(self, batch_indices: np.ndarray, batch_priorities: np.ndarray):
+        for idx, prio in zip(batch_indices, batch_priorities):
+            self.priorities[idx] = prio
+
+    
+
 class NoisyDQN(nn.Module):
     def __init__(self, input_shape: tt.Tuple[int,...],
                  n_actions: int):
@@ -60,3 +117,4 @@ class NoisyDQN(nn.Module):
              (layer.weight_sigma ** 2).mean().sqrt()).item()
             for layer in self.noisy_layers
         ]
+    

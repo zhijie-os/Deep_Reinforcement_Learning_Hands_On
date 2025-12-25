@@ -5,7 +5,6 @@ from torch import nn as nn
 from torchrl.modules import NoisyLinear
 import typing as tt
 
-
 # replay buffer params
 BETA_START = 0.4
 BETA_FRAMES = 100000
@@ -44,11 +43,10 @@ class DuelingDQN(nn.Module):
         xx = x/255.0
         conv_out = self.conv(xx)
         return self.fc_adv(conv_out), self.fc_val(conv_out)
-
+    
     def forward(self, x):
         adv, val = self.adv_val(x)
         return val + (adv - adv.mean(dim=1, keepdim=True))
-
 
 class PrioReplayBuffer(ExperienceReplayBuffer):
     def __init__(self, exp_source: ExperienceSource, buf_size: int, prob_alpha: float = 0.6):

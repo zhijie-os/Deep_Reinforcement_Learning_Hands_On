@@ -10,6 +10,46 @@ import typing as tt
 BETA_START = 0.4
 BETA_FRAMES = 100000
 
+class DuelingDQN(nn.Module):
+    def __init__(self,input_shape, n_actions):
+        super(DuelingDQN, self).__init__()
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(input_shape[0], 32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.ReLU(),
+            nn.Flatten()
+        )
+        
+        size = self.conv(torch.zeros(1, *input_shape)).size()[-1]
+
+        # A(s, a)
+        self.fc_adv = nn.Sequential(
+            nn.Linear(size, 256),
+            nn.ReLU(),
+            nn.Linear(256, n_actions)
+        )
+
+        # V(S)
+        self.fc_val = nn.Sequential(
+            nn.Linear(size, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1)
+        )
+    
+    def adv_val(self,x):
+        xx = x/255.0
+        conv_out = self.conv(xx)
+        return self.fc_adv(conv_out), self.fc_val(conv_out)
+
+    def forward(self, x):
+        adv, val = self.adv_val(x)
+        return val + (adv - adv.mean(dim=1, keepdim=True))
+
+
 class PrioReplayBuffer(ExperienceReplayBuffer):
     def __init__(self, exp_source: ExperienceSource, buf_size: int, prob_alpha: float = 0.6):
         super().__init__(exp_source, buf_size)

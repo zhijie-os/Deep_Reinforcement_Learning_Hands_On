@@ -13,11 +13,10 @@ from ignite.engine import Engine
 from ignite.metrics import RunningAverage
 from ignite.contrib.handlers import tensorboard_logger as tb_logger
 
-from lib import dqn_model, common
+from lib import dqn_model, common, atari_wrappers
 import ale_py # This import is necessary for environments to register 
 
-
-NAME = "02_n_envs"
+NAME = "04_wrappers_n_env"
 
 
 def batch_generator(buffer: ptan.experience.ExperienceReplayBuffer,
@@ -38,16 +37,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dev", default="cpu", help="Device to use, default=cpu")
     parser.add_argument("--envs", type=int, default=3, help="Amount of environments to run in parallel")
+    parser.add_argument("--stack", type=int, default=2, help="Number of stacked frames")
     args = parser.parse_args()
     device = torch.device(args.dev)
 
-    # create multiple environments with args --envs
     envs = [
-        ptan.common.wrappers.wrap_dqn(gym.make(params.env_name))
+        atari_wrappers.wrap_dqn(
+            gym.make(params.env_name),
+            stack_frames=args.stack
+        )
         for _ in range(args.envs)
     ]
     params.batch_size *= args.envs
-
     net = dqn_model.DQN(envs[0].observation_space.shape, envs[0].action_space.n).to(device)
 
     tgt_net = ptan.agent.TargetNet(net)
@@ -94,7 +95,7 @@ if __name__ == "__main__":
             trainer.state.episode, trainer.state.iteration))
         trainer.should_terminate = True
 
-    logdir = f"runs/{datetime.now().isoformat(timespec='minutes').replace(':', '-')}-{params.run_name}-{NAME}={args.envs}"
+    logdir = f"runs/{datetime.now().isoformat(timespec='minutes').replace(':', '-')}-{params.run_name}-{NAME}={args.envs}-stack={args.stack}"
     tb = tb_logger.TensorboardLogger(log_dir=logdir)
     RunningAverage(output_transform=lambda v: v['loss']).attach(engine, "avg_loss")
 

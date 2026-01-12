@@ -4,7 +4,8 @@ import glob
 import pathlib
 import numpy as np
 import typing as tt
-from dataclass import dataclass
+from dataclasses import dataclass
+
 
 @dataclass
 class Prices:
@@ -14,7 +15,7 @@ class Prices:
     close: np.ndarray
     volume: np.ndarray
 
-# read csv tuple <OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL> from csv file
+
 def read_csv(file_path: pathlib.Path, sep: str = ',',
              filter_data: bool = True,
              fix_open_price: bool = False) -> Prices:
@@ -67,7 +68,7 @@ def read_csv(file_path: pathlib.Path, sep: str = ',',
                   close=np.array(c, dtype=np.float32),
                   volume=np.array(v, dtype=np.float32))
 
-# turn actual prices to relative prices, this is the normalization
+
 def prices_to_relative(prices: Prices):
     """
     Convert prices to relative in respect to open price
@@ -80,20 +81,20 @@ def prices_to_relative(prices: Prices):
     return Prices(open=prices.open, high=rh, low=rl,
                   close=rc, volume=prices.volume)
 
-# load actual prices from csv and convert them to relative prices
+
 def load_relative(csv_path: pathlib.Path | str) -> Prices:
     if isinstance(csv_path, str):
         csv_path = pathlib.Path(csv_path)
     return prices_to_relative(read_csv(csv_path))
 
-# Finds all CSV files in a specified directory and returns their paths as pathlib.Path objects
+
 def price_files(dir_name: str) -> tt.List[pathlib.Path]:
     result = []
     for path in glob.glob(os.path.join(dir_name, "*.csv")):
         result.append(pathlib.Path(path))
     return result
 
-# Load all price data files for a given year from a base directory
+
 def load_year_data(
         year: int, basedir: str = 'data'
 ) -> tt.Dict[str, Prices]:

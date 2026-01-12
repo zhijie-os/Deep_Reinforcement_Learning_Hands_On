@@ -7,7 +7,7 @@ import torch.nn as nn
 # the feed forward network uses independent networks for Q-Value and advantage prediction
 class SimpleFFDQN(nn.Module):
     def __init__(self, obs_len, actions_n):
-        super(SimpleFFDQN, self).__init()
+        super(SimpleFFDQN, self).__init__()
 
         # V(s)
         self.fc_val = nn.Sequential(
@@ -47,7 +47,7 @@ class DQNConv1D(nn.Module):
 
         size = self.conv(torch.zeros(1, *shape)).size()[-1]
 
-        self.fc_val = nn.sequential(
+        self.fc_val = nn.Sequential(
             nn.Linear(size, 512),
             nn.ReLU(),
             nn.Linear(512, 1)

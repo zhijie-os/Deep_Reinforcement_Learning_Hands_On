@@ -43,7 +43,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     device = torch.device(args.dev)
 
-    saves_path = SAVES_DIR / f"conv-{args.run}"
+    saves_path = SAVES_DIR / f"simple-{args.run}"
     saves_path.mkdir(parents=True, exist_ok=True)
 
     data_path = pathlib.Path(args.data)
@@ -54,23 +54,30 @@ if __name__ == "__main__":
             stock_data = data.load_year_data(args.year)
         else:
             stock_data = {"YNDX": data.load_relative(data_path)}
-        env = environ.StocksEnv(stock_data, bars_count=BARS_COUNT, state_1d=True)
-        env_tst = environ.StocksEnv(stock_data, bars_count=BARS_COUNT, state_1d=True)
+        env = environ.StocksEnv(
+            stock_data, bars_count=BARS_COUNT)
+        env_tst = environ.StocksEnv(
+            stock_data, bars_count=BARS_COUNT)
     elif data_path.is_dir():
-        env = environ.StocksEnv.from_dir(data_path, bars_count=BARS_COUNT, state_1d=True)
-        env_tst = environ.StocksEnv.from_dir(data_path, bars_count=BARS_COUNT, state_1d=True)
+        env = environ.StocksEnv.from_dir(
+            data_path, bars_count=BARS_COUNT)
+        env_tst = environ.StocksEnv.from_dir(
+            data_path, bars_count=BARS_COUNT)
     else:
         raise RuntimeError("No data to train on")
 
     env = wrappers.TimeLimit(env, max_episode_steps=1000)
     val_data = {"YNDX": data.load_relative(val_path)}
-    env_val = environ.StocksEnv(val_data, bars_count=BARS_COUNT, state_1d=True)
+    env_val = environ.StocksEnv(val_data, bars_count=BARS_COUNT)
+
 
     print(f"Training data shape: {env.observation_space.shape}")
     print(f"Action space: {env.action_space.n}")
     print(f"Training data samples: {stock_data['YNDX']}")
 
-    net = models.DQNConv1D(env.observation_space.shape, env.action_space.n).to(device)
+
+    net = models.SimpleFFDQN(env.observation_space.shape[0],
+                             env.action_space.n).to(device)
     tgt_net = ptan.agent.TargetNet(net)
 
     selector = ptan.actions.EpsilonGreedyActionSelector(EPS_START)
@@ -104,7 +111,7 @@ if __name__ == "__main__":
         }
 
     engine = Engine(process_batch)
-    tb = common.setup_ignite(engine, exp_source, f"conv-{args.run}",
+    tb = common.setup_ignite(engine, exp_source, f"simple-{args.run}",
                              extra_metrics=('values_mean',))
 
     @engine.on(ptan.ignite.PeriodEvents.ITERS_1000_COMPLETED)
@@ -144,7 +151,6 @@ if __name__ == "__main__":
             engine.state.best_val_reward = val_reward
             path = saves_path / ("val_reward-%.3f.data" % val_reward)
             torch.save(net.state_dict(), path)
-
 
     event = ptan.ignite.PeriodEvents.ITERS_10000_COMPLETED
     tst_metrics = [m + "_tst" for m in validation.METRICS]

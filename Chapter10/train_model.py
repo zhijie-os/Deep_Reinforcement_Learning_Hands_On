@@ -35,7 +35,7 @@ STATES_TO_EVALUATE = 1000
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dev", help="Training device name", default="cuda")
+    parser.add_argument("--dev", help="Training device name", default="cpu")
     parser.add_argument("--data", default=STOCKS, help=f"Stocks file or dir, default={STOCKS}")
     parser.add_argument("--year", type=int, help="Year to train on, overrides --data")
     parser.add_argument("--val", default=VAL_STOCKS, help="Validation data, default=" + VAL_STOCKS)

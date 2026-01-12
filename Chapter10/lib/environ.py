@@ -147,3 +147,53 @@ class State:
         reward = 0.0
         done = False
         close = self._cur_close()
+
+        # if the action is buy, and currently does not hold a share
+        if action == Actions.Buy and not self.have_position:
+            self.have_position = True
+            self.open_price = close
+            reward -= self.commission_perc # get commission deducated from the reward
+        elif action == Actions.Close and self.have_position: # if we currenty hold the share and the action is to sell
+            reward -= self.commission_perc  # pay the commission fee
+            done |= self.reset_on_close # see if we reset 
+            if self.reward_on_close:
+                reward += 100.0 * (close / self.open_price - 1.0)
+                self.have_position = False
+                self.open_price = 0.0
+        self._offset += 1 # change the day - offset
+        prev_close = close 
+        close = self._cur_close()
+        done |= self._offset >= self._prices.close.shape[0] - 1 # check if reached the end of the calendar year, forcefully close
+
+        # if reward is enabled for each step
+        if self.have_position and not self.reward_on_close:
+            reward += 100.0 * (close/prev_close - 1.0) # calculate reward for each step
+        
+        return reward, done
+
+class State1D(State):
+    @property
+    def shape(self): # high, low, close, volumes, position_flag, rel_profit
+        if self.volumes:
+            return 6, self.bars_count
+        else:   # high, low, close, position flag, relative profit
+            return 5, self.bars_count
+    
+    def encode(self):
+        res = np.zeros(shape=self.shape, dtype=np.float32)
+        start = self._offset - (self.bars_count - 1)
+        stop = self._offset + 1
+        res[0] = self._prices.high[start:stop]
+        res[1] = self._prices.low[start:stop]
+        res[2] = self._prices.close[start:stop]
+        if self.volumes:
+            res[3] = self._prices.volume[start:stop]
+            dst = 4
+        else:
+            dst = 3
+        if self.have_position:
+            res[dst] = 1.0  # position flag
+            res[dst+1] = self._cur_close() / self.open_price - 1.0 # relateive profit
+        return res
+
+    

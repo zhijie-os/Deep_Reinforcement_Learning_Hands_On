@@ -43,7 +43,7 @@ def calc_qvals(rewards: tt.List[float]) -> tt.List[float]:
 
 if __name__ == "__main__":
     env = gym.make("CartPole-v1")
-    writer = SummaryWriter(comment="-cartpole-reinforce")
+    writer = SummaryWriter(comment="-cartpole-reinforce-baseline")
 
     net = PGN(env.observation_space.shape[0], env.action_space.n)
     print(net)

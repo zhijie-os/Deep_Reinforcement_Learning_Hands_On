@@ -1,5 +1,6 @@
 import gymnasium as gym
 import ptan
+from ptan.experience import ExperienceSourceFirstLast
 import numpy as np
 import typing as tt
 from tensorboardX import SummaryWriter

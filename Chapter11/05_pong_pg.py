@@ -24,6 +24,7 @@ GRAD_L2_CLIP = 0.39215
 
 ENV_COUNT = 32
 
+# vanila REINFOCE and policy gradient methods do not converge well on pong gamed
 
 def make_env():
     return ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))

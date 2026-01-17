@@ -64,7 +64,7 @@ if __name__ == "__main__":
     for step_idx, exp in enumerate(exp_source):
         reward_sum += exp.reward
         baseline = reward_sum / (step_idx + 1)
-        writer.add_scaler("baseline", baseline, step_idx)
+        writer.add_scalar("baseline", baseline, step_idx)
         batch_states.append(exp.state)
         batch_actions.append(int(exp.action))
         batch_scales.append(exp.reward - baseline)

@@ -28,7 +28,7 @@ class PGN(nn.Module):
         )
 
     def forward(self, x):
-        return self.next(x)
+        return self.net(x)
     
 def smooth(old, val, alpha):
     if old is None:

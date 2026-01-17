@@ -125,10 +125,7 @@ if __name__ == "__main__":
             grad_means += (p.grad ** 2).mean().sqrt().item()
             grad_count += 1
 
-        bs_smoothed = smooth(
-            bs_smoothed,
-            float(np.mean(batch_scales))
-        )
+        bs_smoothed = smooth( bs_smoothed, float(np.mean(batch_scales)))
         entropy = smooth(entropy, entropy_t.item())
         l_entropy = smooth(l_entropy, entropy_loss_t.item())
         l_policy = smooth(l_policy, loss_policy_t.item())

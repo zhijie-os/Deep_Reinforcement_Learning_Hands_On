@@ -100,7 +100,11 @@ if __name__ == "__main__":
         log_prob_actions_v = batch_scale_v * log_p_a_v
         loss_policy_v = -log_prob_actions_v.mean()
 
-        loss_policy_v.backward(retain_graph=True)
+        loss_policy_v.backward(retain_graph=True)   # calculating the gradients and keeping them in our model's buffers
+        # keep the graph structure of the variables
+
+
+        # iterate all paramters from our model and extract the grad field
         grads = np.concatenate([p.grad.data.numpy().flatten()
                                 for p in net.parameters()
                                 if p.grad is not None])
@@ -108,7 +112,11 @@ if __name__ == "__main__":
         prob_v = F.softmax(logits_v, dim=1)
         entropy_v = -(prob_v * log_prob_v).sum(dim=1).mean()
         entropy_loss_v = -ENTROPY_BETA * entropy_v
+
+        # call backward again to pass the entropy loss, add the entropy loss gradient to the gradient buffer
         entropy_loss_v.backward()
+
+        # carry out the gradient prop
         optimizer.step()
 
         loss_v = loss_policy_v + entropy_loss_v

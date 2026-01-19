@@ -38,7 +38,7 @@ if __name__ == "__main__":
         for _ in range(NUM_ENVS)
     ]
     if args.use_async:
-        env = gym.vector.AsyncVectorEnv(env_factories)
+        env = gym.vector.AsyncVectorEnv(env_factories)  # data parallelism
     else:
         env = gym.vector.SyncVectorEnv(env_factories)
     writer = SummaryWriter(comment="-pong-a2c_" + args.name)

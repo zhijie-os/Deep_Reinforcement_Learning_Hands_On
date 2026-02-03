@@ -9,7 +9,7 @@ HID_SIZE = 128
 
 class ModelA2C(nn.Module):
     def __init__(self, obs_size, act_size):
-        super(Model2AC, self).__init__()
+        super(ModelA2C, self).__init__()
 
         # shared feature extractor/backbone network
         # extract features (ONCE)

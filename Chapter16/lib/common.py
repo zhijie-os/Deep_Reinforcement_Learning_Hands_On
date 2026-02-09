@@ -71,3 +71,33 @@ def unpack_batch_a2c(
     ref_vals_v = torch.FloatTensor(rewards_np).to(device)
     return states_v, actions_v, ref_vals_v
 
+def calc_adv_ref(trajectory: tt.List[ptan.experience.Experience],
+                 net_crt: model.ModelCritic, states_v: torch.Tensor, gamma: float,
+                 gae_lambda: float, device: torch.device):
+    """
+    By trajectory calculate advantage and 1-step ref value
+    :param trajectory: trajectory list
+    :param net_crt: critic network
+    :param states_v: states tensor
+    :return: tuple with advantage numpy array and reference values
+    """
+    values_v = net_crt(states_v)
+    values = values_v.squeeze().data.cpu().numpy()
+    # generalized advantage estimator: smoothed version of the advantage
+    last_gae = 0.0
+    result_adv = []
+    result_ref = []
+    for val, next_val, (exp,) in zip(
+            reversed(values[:-1]), reversed(values[1:]), reversed(trajectory[:-1])):
+        if exp.done_trunc:
+            delta = exp.reward - val
+            last_gae = delta
+        else:
+            delta = exp.reward + gamma * next_val - val
+            last_gae = delta + gamma * gae_lambda * last_gae
+        result_adv.append(last_gae)
+        result_ref.append(last_gae + val)
+
+    adv_v = torch.FloatTensor(np.asarray(list(reversed(result_adv))))
+    ref_v = torch.FloatTensor(np.asarray(list(reversed(result_ref))))
+    return adv_v.to(device), ref_v.to(device)
